@@ -2,11 +2,11 @@ const db = require('../config/database');
 
 class Message {
     static async create(messageData) {
-        const { chat_id, sender_id, content } = messageData;
+        const { chat_id, sender_id, content, sentiment } = messageData;
 
         const [result] = await db.execute(
-            'INSERT INTO messages (chat_id, sender_id, content) VALUES (?, ?, ?)',
-            [chat_id, sender_id, content]
+            'INSERT INTO messages (chat_id, sender_id, content, sentiment) VALUES (?, ?, ?, ?)',
+            [chat_id, sender_id, content, sentiment || 'neutral']
         );
 
         // Update chat's updated_at
@@ -26,6 +26,7 @@ class Message {
                 m.sender_id,
                 m.is_read,
                 m.created_at,
+                m.sentiment,
                 u.full_name as sender_name
             FROM messages m
             JOIN users u ON m.sender_id = u.id

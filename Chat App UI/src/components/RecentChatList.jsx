@@ -34,15 +34,16 @@ export default function RecentChatList({ navigateTo, refreshTrigger }) {
       fetchChats(true);
     };
 
-    // Polling loop to fetch new messages and status updates every 2 seconds
-    const pollInterval = setInterval(() => {
+    const handleChatUpdated = () => {
       fetchChats(true);
-    }, 2000);
+    };
 
     window.addEventListener('friendship-changed', handleFriendshipChange);
+    window.addEventListener('chat-updated', handleChatUpdated);
+
     return () => {
       window.removeEventListener('friendship-changed', handleFriendshipChange);
-      clearInterval(pollInterval);
+      window.removeEventListener('chat-updated', handleChatUpdated);
     };
   }, [refreshTrigger]);
 

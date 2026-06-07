@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { io } from 'socket.io-client';
 import axiosInstance from '../utils/axiosInstance';
 import ChatMessages from '../components/ChatMessages';
 import MessageInput from '../components/MessageInput';
@@ -17,10 +18,19 @@ export default function ChatWindow({ userId: propUserId, onBack }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
 
   const currentUserStr = localStorage.getItem('user');
   const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
   const currentUserId = currentUser ? currentUser.id : null;
+
+  const socketRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
+
+  // Determine socket connection URL
+  const socketUrl = import.meta.env.VITE_API_URL
+    ? import.meta.env.VITE_API_URL.replace('/api', '')
+    : 'http://localhost:5000';
 
   // Scroll to bottom helper
   const scrollToBottom = (behavior = 'smooth') => {
@@ -44,6 +54,24 @@ export default function ChatWindow({ userId: propUserId, onBack }) {
         setChat(chat);
         setMessages(messages);
         
+        // Mark messages as read on backend via API call
+        await axiosInstance.patch('/messages/read', {
+          chatId: chat.id,
+          senderId: parseInt(userId)
+        });
+
+        // Emit markAsRead socket event
+        if (socketRef.current) {
+          socketRef.current.emit('markAsRead', {
+            chatId: chat.id,
+            readerId: currentUserId,
+            senderId: parseInt(userId)
+          });
+        }
+
+        // Notify RecentChatList to update
+        window.dispatchEvent(new Event('chat-updated'));
+        
         // Immediate scroll to bottom
         setTimeout(() => scrollToBottom('auto'), 50);
       } catch (err) {
@@ -61,32 +89,152 @@ export default function ChatWindow({ userId: propUserId, onBack }) {
     return () => {
       active = false;
     };
-  }, [userId]);
+  }, [userId, currentUserId]);
 
-  // Polling loop for real-time messages
+  // Setup Socket connection and connection-based listeners
   useEffect(() => {
-    if (!chat) return;
+    if (!currentUserId) return;
 
-    let pollInterval = setInterval(async () => {
-      try {
-        const res = await axiosInstance.get(`/messages/${chat.id}`);
-        // Only update if there are new messages or changes to avoid redundant re-renders
-        if (JSON.stringify(res.data) !== JSON.stringify(messages)) {
-          setMessages(res.data);
-          scrollToBottom('smooth');
-        }
-      } catch (err) {
-        console.error('Error polling messages:', err);
+    const socket = io(socketUrl);
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      socket.emit('userOnline', currentUserId);
+    });
+
+    if (socket.connected) {
+      socket.emit('userOnline', currentUserId);
+    }
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [currentUserId, socketUrl]);
+
+  // Setup Socket listeners for active chat events
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket || !chat) return;
+
+    const handleNewMessage = (message) => {
+      if (message.chat_id === chat.id) {
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === message.id)) return prev;
+          return [...prev, message];
+        });
+        scrollToBottom('smooth');
+        
+        // Mark new message as read on backend via HTTP and Socket
+        axiosInstance.patch('/messages/read', {
+          chatId: chat.id,
+          senderId: parseInt(userId)
+        }).catch(err => console.error('Failed to mark incoming message as read:', err));
+
+        socket.emit('markAsRead', {
+          chatId: chat.id,
+          readerId: currentUserId,
+          senderId: parseInt(userId)
+        });
+
+        window.dispatchEvent(new Event('chat-updated'));
+      } else {
+        // Just trigger sidebar refresh for other chats
+        window.dispatchEvent(new Event('chat-updated'));
       }
-    }, 1000);
+    };
 
-    return () => clearInterval(pollInterval);
-  }, [chat, messages]);
+    const handleUserTyping = ({ chatId, senderId }) => {
+      if (chatId === chat.id && senderId === parseInt(userId)) {
+        setIsTyping(true);
+      }
+    };
 
-  // Send message
+    const handleUserStopTyping = ({ chatId, senderId }) => {
+      if (chatId === chat.id && senderId === parseInt(userId)) {
+        setIsTyping(false);
+      }
+    };
+
+    const handleMessagesRead = ({ chatId, readerId }) => {
+      if (chatId === chat.id && readerId === parseInt(userId)) {
+        setMessages((prev) =>
+          prev.map((m) => (m.sender_id === currentUserId ? { ...m, is_read: true } : m))
+        );
+      }
+      window.dispatchEvent(new Event('chat-updated'));
+    };
+
+    socket.on('newMessage', handleNewMessage);
+    socket.on('userTyping', handleUserTyping);
+    socket.on('userStopTyping', handleUserStopTyping);
+    socket.on('messagesRead', handleMessagesRead);
+
+    return () => {
+      socket.off('newMessage', handleNewMessage);
+      socket.off('userTyping', handleUserTyping);
+      socket.off('userStopTyping', handleUserStopTyping);
+      socket.off('messagesRead', handleMessagesRead);
+    };
+  }, [chat, userId, currentUserId]);
+
+  // Clear typing indicators when switching chats
+  useEffect(() => {
+    setIsTyping(false);
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      if (socketRef.current && chat) {
+        socketRef.current.emit('stopTyping', {
+          chatId: chat.id,
+          senderId: currentUserId,
+          receiverId: parseInt(userId)
+        });
+      }
+    };
+  }, [userId, chat, currentUserId]);
+
+  // Emit typing event and handle debounce stopTyping trigger
+  const handleTyping = () => {
+    if (!chat || !socketRef.current) return;
+
+    socketRef.current.emit('typing', {
+      chatId: chat.id,
+      senderId: currentUserId,
+      receiverId: parseInt(userId)
+    });
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    typingTimeoutRef.current = setTimeout(() => {
+      if (socketRef.current) {
+        socketRef.current.emit('stopTyping', {
+          chatId: chat.id,
+          senderId: currentUserId,
+          receiverId: parseInt(userId)
+        });
+      }
+    }, 2000);
+  };
+
+  // Send message with Optimistic UI updates
   const handleSendMessage = async (content) => {
     if (!chat) return;
     
+    // Stop typing immediately when message is sent
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    if (socketRef.current) {
+      socketRef.current.emit('stopTyping', {
+        chatId: chat.id,
+        senderId: currentUserId,
+        receiverId: parseInt(userId)
+      });
+    }
+
     // Create optimistic message for instant UI feedback
     const optimisticMessage = {
       id: 'optimistic-' + Date.now(),
@@ -94,7 +242,8 @@ export default function ChatWindow({ userId: propUserId, onBack }) {
       sender_id: currentUserId,
       created_at: new Date().toISOString(),
       sender_name: currentUser?.full_name || 'Me',
-      is_read: false
+      is_read: false,
+      sentiment: 'neutral'
     };
 
     // Append immediately to state
@@ -104,14 +253,20 @@ export default function ChatWindow({ userId: propUserId, onBack }) {
     setTimeout(() => scrollToBottom('smooth'), 20);
 
     try {
-      await axiosInstance.post('/messages', {
+      setSending(true);
+      const res = await axiosInstance.post('/messages', {
         chatId: chat.id,
         content
       });
-      
-      // Fetch actual message list with official database keys in background
-      const res = await axiosInstance.get(`/messages/${chat.id}`);
-      setMessages(res.data);
+
+      // Update optimistic message with real message containing sentiment and DB ID
+      const officialMessage = res.data.newMessage;
+      setMessages(prev => 
+        prev.map(m => m.id === optimisticMessage.id ? officialMessage : m)
+      );
+
+      // Trigger sidebar update
+      window.dispatchEvent(new Event('chat-updated'));
     } catch (err) {
       console.error('Failed to send message:', err);
       alert(err.response?.data?.error || 'Failed to send message');
@@ -123,6 +278,8 @@ export default function ChatWindow({ userId: propUserId, onBack }) {
       } catch (rollbackErr) {
         console.error('Rollback fetch failed:', rollbackErr);
       }
+    } finally {
+      setSending(false);
     }
   };
 
@@ -131,8 +288,16 @@ export default function ChatWindow({ userId: propUserId, onBack }) {
   const avatarUrl = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(recipientName)}&backgroundType=gradientLinear&fontSize=42`;
 
   const chatCard = (
-    <div className="card shadow-sm border-0 d-flex flex-column h-100" style={{ borderRadius: '16px', minHeight: '620px' }}>
+    <div className="card shadow-sm border-0 d-flex flex-column h-100" style={{ borderRadius: '16px', minHeight: isEmbedded ? 'auto' : '620px' }}>
       
+      {/* CSS Bounce Animation for Typing Dots */}
+      <style>{`
+        @keyframes bounce {
+          0%, 80%, 100% { transform: scale(0); }
+          40% { transform: scale(1.0); }
+        }
+      `}</style>
+
       {/* Card Header */}
       <div className="card-header bg-white border-0 py-3 px-4 d-flex align-items-center justify-content-between shadow-sm" style={{ borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }}>
         <div className="d-flex align-items-center">
@@ -209,8 +374,20 @@ export default function ChatWindow({ userId: propUserId, onBack }) {
               )}
               <div ref={messagesEndRef} />
             </div>
+
+            {/* Typing Indicator Bubble */}
+            {isTyping && (
+              <div className="text-muted text-start ps-3 py-2 small d-flex align-items-center" style={{ fontStyle: 'italic', zIndex: 5 }}>
+                <span className="me-1">{recipientName} is typing</span>
+                <span className="typing-dots d-inline-flex gap-1 align-items-center">
+                  <span className="dot" style={{ width: '4px', height: '4px', backgroundColor: '#6c757d', borderRadius: '50%', display: 'inline-block', animation: 'bounce 1.4s infinite ease-in-out both' }}></span>
+                  <span className="dot" style={{ width: '4px', height: '4px', backgroundColor: '#6c757d', borderRadius: '50%', display: 'inline-block', animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '0.2s' }}></span>
+                  <span className="dot" style={{ width: '4px', height: '4px', backgroundColor: '#6c757d', borderRadius: '50%', display: 'inline-block', animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '0.4s' }}></span>
+                </span>
+              </div>
+            )}
             
-            <MessageInput onSendMessage={handleSendMessage} disabled={sending} />
+            <MessageInput onSendMessage={handleSendMessage} disabled={sending} onTyping={handleTyping} />
           </>
         )}
       </div>

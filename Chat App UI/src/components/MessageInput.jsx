@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-export default function MessageInput({ onSendMessage, disabled }) {
+export default function MessageInput({ onSendMessage, disabled, onTyping }) {
   const [newMessage, setNewMessage] = useState('');
 
   const handleSend = () => {
@@ -17,6 +17,13 @@ export default function MessageInput({ onSendMessage, disabled }) {
     }
   };
 
+  const handleChange = (e) => {
+    setNewMessage(e.target.value);
+    if (onTyping) {
+      onTyping();
+    }
+  };
+
   return (
     <div className="d-flex align-items-center pt-3 mt-auto bg-white">
       <input 
@@ -24,7 +31,7 @@ export default function MessageInput({ onSendMessage, disabled }) {
         className="form-control rounded-pill border px-4 py-2 shadow-sm me-2" 
         placeholder="Type a message..." 
         value={newMessage}
-        onChange={(e) => setNewMessage(e.target.value)}
+        onChange={handleChange}
         onKeyDown={handleKeyPress}
         disabled={disabled}
       />

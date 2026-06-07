@@ -23,7 +23,7 @@ export default function Home() {
       <div className="row h-100 g-4">
         
         {/* Left Side: Recent Chats */}
-        <div className="col-md-4 col-lg-3 h-100">
+        <div className={`col-md-4 col-lg-3 h-100 ${activeChatUserId ? 'd-none d-md-block' : 'd-block'}`}>
           <div className="card shadow-sm border-0 h-100 d-flex flex-column" style={{ borderRadius: '16px', overflow: 'hidden' }}>
             <div className="card-header bg-white border-0 py-3 d-flex align-items-center justify-content-between">
               <h5 className="mb-0 fw-bold text-dark">Chats</h5>
@@ -46,11 +46,11 @@ export default function Home() {
         </div>
 
         {/* Right Side: Chat Window or Empty Splash */}
-        <div className="col-md-8 col-lg-9 h-100">
+        <div className={`col-md-8 col-lg-9 h-100 ${activeChatUserId ? 'd-block' : 'd-none d-md-block'}`}>
           {activeChatUserId ? (
             <ChatWindow userId={activeChatUserId} onBack={handleBack} />
           ) : (
-            <div className="card shadow-sm border-0 h-100 d-flex flex-column justify-content-center align-items-center bg-white" style={{ borderRadius: '16px', minHeight: '620px' }}>
+            <div className="card shadow-sm border-0 h-100 d-flex flex-column justify-content-center align-items-center bg-white" style={{ borderRadius: '16px' }}>
               <div className="text-center p-5">
                 <div className="display-3 mb-4 text-primary bg-light rounded-circle d-inline-flex align-items-center justify-content-center shadow-sm" style={{ width: '100px', height: '100px' }}>
                   💬
