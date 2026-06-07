@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import RecentChatList from '../components/RecentChatList';
 import ChatWindow from './ChatWindow';
 import UserList from '../components/UserList';
 
 export default function Home() {
-  const [activeChatUserId, setActiveChatUserId] = useState(null);
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const activeChatUserId = searchParams.get('chat');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showFriendsModal, setShowFriendsModal] = useState(false);
 
@@ -51,12 +54,12 @@ export default function Home() {
 
   function handleNavigate(page, userId) {
     if (page === 'chat') {
-      setActiveChatUserId(userId);
+      navigate(`/home?chat=${userId}`);
     }
   }
 
   const handleBack = () => {
-    setActiveChatUserId(null);
+    navigate('/home');
   };
 
   return (
