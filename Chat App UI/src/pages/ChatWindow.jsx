@@ -5,7 +5,7 @@ import axiosInstance from '../utils/axiosInstance';
 import ChatMessages from '../components/ChatMessages';
 import MessageInput from '../components/MessageInput';
 
-export default function ChatWindow({ userId: propUserId, onBack }) {
+export default function ChatWindow({ userId: propUserId, onBack, socket }) {
   const navigate = useNavigate();
   const { userId: paramUserId } = useParams(); // other user's ID
   const userId = propUserId || paramUserId;
@@ -26,6 +26,11 @@ export default function ChatWindow({ userId: propUserId, onBack }) {
 
   const socketRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+
+  // Sync socket prop to socketRef
+  useEffect(() => {
+    socketRef.current = socket;
+  }, [socket]);
 
   // Determine socket connection URL
   const socketUrl = import.meta.env.VITE_API_URL
@@ -90,26 +95,6 @@ export default function ChatWindow({ userId: propUserId, onBack }) {
       active = false;
     };
   }, [userId, currentUserId]);
-
-  // Setup Socket connection and connection-based listeners
-  useEffect(() => {
-    if (!currentUserId) return;
-
-    const socket = io(socketUrl);
-    socketRef.current = socket;
-
-    socket.on('connect', () => {
-      socket.emit('userOnline', currentUserId);
-    });
-
-    if (socket.connected) {
-      socket.emit('userOnline', currentUserId);
-    }
-
-    return () => {
-      socket.disconnect();
-    };
-  }, [currentUserId, socketUrl]);
 
   // Setup Socket listeners for active chat events
   useEffect(() => {

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { io } from 'socket.io-client';
 import RecentChatList from '../components/RecentChatList';
 import ChatWindow from './ChatWindow';
 import UserList from '../components/UserList';
@@ -7,6 +8,46 @@ export default function Home() {
   const [activeChatUserId, setActiveChatUserId] = useState(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showFriendsModal, setShowFriendsModal] = useState(false);
+
+  const currentUserStr = localStorage.getItem('user');
+  const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
+  const currentUserId = currentUser ? currentUser.id : null;
+
+  const socketRef = useRef(null);
+
+  // Determine socket connection URL
+  const socketUrl = import.meta.env.VITE_API_URL
+    ? import.meta.env.VITE_API_URL.replace('/api', '')
+    : 'http://localhost:5000';
+
+  // Global socket setup at the Home dashboard level
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const socket = io(socketUrl);
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      socket.emit('userOnline', currentUserId);
+    });
+
+    if (socket.connected) {
+      socket.emit('userOnline', currentUserId);
+    }
+
+    // Refresh the recent chat list sidebar instantly on incoming message or read receipt
+    socket.on('newMessage', (message) => {
+      window.dispatchEvent(new Event('chat-updated'));
+    });
+
+    socket.on('messagesRead', () => {
+      window.dispatchEvent(new Event('chat-updated'));
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [currentUserId, socketUrl]);
 
   function handleNavigate(page, userId) {
     if (page === 'chat') {
@@ -48,7 +89,11 @@ export default function Home() {
         {/* Right Side: Chat Window or Empty Splash */}
         <div className={`col-md-8 col-lg-9 h-100 ${activeChatUserId ? 'd-block' : 'd-none d-md-block'}`}>
           {activeChatUserId ? (
-            <ChatWindow userId={activeChatUserId} onBack={handleBack} />
+            <ChatWindow 
+              userId={activeChatUserId} 
+              onBack={handleBack} 
+              socket={socketRef.current} 
+            />
           ) : (
             <div className="card shadow-sm border-0 h-100 d-flex flex-column justify-content-center align-items-center bg-white" style={{ borderRadius: '16px' }}>
               <div className="text-center p-5">
