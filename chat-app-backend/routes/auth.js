@@ -6,9 +6,9 @@ const router = express.Router();
 // Register
 router.post('/register', async (req, res) => {
     try {
-        const { full_name, email, password, confirmPassword } = req.body;
+        const { full_name, username, password, confirmPassword } = req.body;
         
-        if (!full_name || !email || !password) {
+        if (!full_name || !username || !password) {
             return res.status(400).json({ error: 'All fields are required' });
         }
         
@@ -17,12 +17,12 @@ router.post('/register', async (req, res) => {
         }
         
         // Check if user exists
-        const existingUser = await User.findByEmail(email);
+        const existingUser = await User.findByUsername(username);
         if (existingUser) {
-            return res.status(400).json({ error: 'User already exists' });
+            return res.status(400).json({ error: 'Username already taken' });
         }
         
-        const userId = await User.create({ full_name, email, password });
+        const userId = await User.create({ full_name, username, password });
         
         res.status(201).json({ 
             message: 'User registered successfully',
@@ -36,13 +36,13 @@ router.post('/register', async (req, res) => {
 // Login
 router.post('/login', async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { username, password } = req.body;
         
-        if (!email || !password) {
-            return res.status(400).json({ error: 'Email and password are required' });
+        if (!username || !password) {
+            return res.status(400).json({ error: 'Username and password are required' });
         }
         
-        const user = await User.findByEmail(email);
+        const user = await User.findByUsername(username);
         if (!user) {
             return res.status(400).json({ error: 'Invalid credentials' });
         }
@@ -56,7 +56,7 @@ router.post('/login', async (req, res) => {
         await User.updateStatus(user.id, 'online');
         
         const token = jwt.sign(
-            { userId: user.id, email: user.email },
+            { userId: user.id, username: user.username },
             process.env.JWT_SECRET,
             { expiresIn: '24h' }
         );
@@ -67,7 +67,7 @@ router.post('/login', async (req, res) => {
             user: {
                 id: user.id,
                 full_name: user.full_name,
-                email: user.email
+                username: user.username
             }
         });
     } catch (error) {
@@ -75,18 +75,21 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// Forgot Password (basic implementation)
+// Forgot Password (basic implementation for username)
 router.post('/forgot-password', async (req, res) => {
     try {
-        const { email } = req.body;
+        const { username } = req.body;
         
-        const user = await User.findByEmail(email);
+        if (!username) {
+            return res.status(400).json({ error: 'Username is required' });
+        }
+
+        const user = await User.findByUsername(username);
         if (!user) {
             return res.status(400).json({ error: 'User not found' });
         }
         
-        // In a real app, you would send an email with reset link
-        res.json({ message: 'Password reset link sent to your email' });
+        res.json({ message: 'Password reset instructions sent to your registered username contact.' });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

@@ -4,7 +4,7 @@ import axiosInstance from '../utils/axiosInstance';
 
 export default function Register() {
   const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -17,7 +17,7 @@ export default function Register() {
     setError('');
     setSuccess('');
 
-    if (!fullName || !email || !password || !confirmPassword) {
+    if (!fullName || !username || !password || !confirmPassword) {
       setError('All fields are required.');
       return;
     }
@@ -31,14 +31,14 @@ export default function Register() {
     try {
       const response = await axiosInstance.post('/auth/register', {
         full_name: fullName,
-        email,
+        username: username.trim().toLowerCase(),
         password,
         confirmPassword,
       });
 
       setSuccess(response.data.message || 'Registration successful! Redirecting to login...');
       setFullName('');
-      setEmail('');
+      setUsername('');
       setPassword('');
       setConfirmPassword('');
       
@@ -56,19 +56,19 @@ export default function Register() {
     <div className="container mt-5">
       <div className="row justify-content-center">
         <div className="col-md-6">
-          <div className="card shadow-lg border-0 rounded-3">
+          <div className="card card-custom shadow-lg border-0">
             <div className="card-body p-5">
               <h3 className="card-title text-center mb-4 fw-bold text-success">Create Account</h3>
               
               {error && <div className="alert alert-danger" role="alert">{error}</div>}
               {success && <div className="alert alert-success" role="alert">{success}</div>}
-
+ 
               <form onSubmit={handleSubmit}>
                 <div className="mb-3">
                   <label htmlFor="fullName" className="form-label fw-semibold">Full Name</label>
                   <input 
                     type="text" 
-                    className="form-control form-control-lg" 
+                    className="form-control form-control-lg form-input-custom" 
                     id="fullName" 
                     placeholder="Enter full name" 
                     value={fullName}
@@ -77,14 +77,14 @@ export default function Register() {
                   />
                 </div>
                 <div className="mb-3">
-                  <label htmlFor="email" className="form-label fw-semibold">Email Address</label>
+                  <label htmlFor="username" className="form-label fw-semibold">Username</label>
                   <input 
-                    type="email" 
-                    className="form-control form-control-lg" 
-                    id="email" 
-                    placeholder="Enter email" 
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    type="text" 
+                    className="form-control form-control-lg form-input-custom" 
+                    id="username" 
+                    placeholder="Enter unique username" 
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
                     required
                   />
                 </div>
@@ -92,7 +92,7 @@ export default function Register() {
                   <label htmlFor="password" className="form-label fw-semibold">Password</label>
                   <input 
                     type="password" 
-                    className="form-control form-control-lg" 
+                    className="form-control form-control-lg form-input-custom" 
                     id="password" 
                     placeholder="Enter password" 
                     value={password}
@@ -104,7 +104,7 @@ export default function Register() {
                   <label htmlFor="confirmPassword" className="form-label fw-semibold">Confirm Password</label>
                   <input 
                     type="password" 
-                    className="form-control form-control-lg" 
+                    className="form-control form-control-lg form-input-custom" 
                     id="confirmPassword" 
                     placeholder="Confirm password" 
                     value={confirmPassword}
@@ -115,12 +115,12 @@ export default function Register() {
                 
                 <button 
                   type="submit" 
-                  className="btn btn-success btn-lg w-100 mb-3 shadow-sm"
+                  className="btn btn-success btn-lg w-100 mb-3 shadow-sm rounded-3 fw-bold"
                   disabled={loading}
                 >
                   {loading ? 'Creating Account...' : 'Register'}
                 </button>
-
+ 
                 <div className="text-center mt-3">
                   <span className="text-muted">Already have an account? </span>
                   <Link to="/login" className="text-decoration-none fw-semibold text-success">

@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import axiosInstance from '../utils/axiosInstance';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -15,15 +15,15 @@ export default function Login() {
     setError('');
     setSuccess('');
 
-    if (!email || !password) {
-      setError('Please enter both email and password.');
+    if (!username || !password) {
+      setError('Please enter both username and password.');
       return;
     }
 
     setLoading(true);
     try {
       const response = await axiosInstance.post('/auth/login', {
-        email,
+        username: username.trim().toLowerCase(),
         password,
       });
 
@@ -32,7 +32,7 @@ export default function Login() {
       localStorage.setItem('user', JSON.stringify(user));
 
       setSuccess('Login successful! Redirecting to home...');
-      setEmail('');
+      setUsername('');
       setPassword('');
 
       setTimeout(() => {
@@ -49,23 +49,23 @@ export default function Login() {
     <div className="container mt-5">
       <div className="row justify-content-center">
         <div className="col-md-6">
-          <div className="card shadow-lg border-0 rounded-3">
+          <div className="card card-custom shadow-lg border-0">
             <div className="card-body p-5">
               <h3 className="card-title text-center mb-4 fw-bold text-primary">Welcome Back</h3>
               
               {error && <div className="alert alert-danger" role="alert">{error}</div>}
               {success && <div className="alert alert-success" role="alert">{success}</div>}
-
+ 
               <form onSubmit={handleSubmit}>
                 <div className="mb-3">
-                  <label htmlFor="email" className="form-label fw-semibold">Email Address</label>
+                  <label htmlFor="username" className="form-label fw-semibold">Username</label>
                   <input 
-                    type="email" 
-                    className="form-control form-control-lg" 
-                    id="email" 
-                    placeholder="Enter email" 
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    type="text" 
+                    className="form-control form-control-lg form-input-custom" 
+                    id="username" 
+                    placeholder="Enter username" 
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
                     required
                   />
                 </div>
@@ -73,7 +73,7 @@ export default function Login() {
                   <label htmlFor="password" className="form-label fw-semibold">Password</label>
                   <input 
                     type="password" 
-                    className="form-control form-control-lg" 
+                    className="form-control form-control-lg form-input-custom" 
                     id="password" 
                     placeholder="Enter password" 
                     value={password}
@@ -84,12 +84,12 @@ export default function Login() {
                 
                 <button 
                   type="submit" 
-                  className="btn btn-primary btn-lg w-100 mb-3 shadow-sm"
+                  className="btn btn-primary btn-lg w-100 mb-3 shadow-sm rounded-3 fw-bold"
                   disabled={loading}
                 >
                   {loading ? 'Logging in...' : 'Login'}
                 </button>
-
+ 
                 <div className="text-center mb-2">
                   <Link to="/forgot-password" className="text-decoration-none fw-semibold text-primary">
                     Forgot Password?

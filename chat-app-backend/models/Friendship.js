@@ -63,9 +63,9 @@ class Friendship {
                     ELSE u1.full_name 
                 END as friend_name,
                 CASE 
-                    WHEN f.user1_id = ? THEN u2.email 
-                    ELSE u1.email 
-                END as friend_email,
+                    WHEN f.user1_id = ? THEN u2.username 
+                    ELSE u1.username 
+                END as friend_username,
                 CASE 
                     WHEN f.user1_id = ? THEN u2.status 
                     ELSE u1.status 

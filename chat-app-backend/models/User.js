@@ -3,28 +3,28 @@ const bcrypt = require('bcryptjs');
 
 class User {
     static async create(userData) {
-        const { full_name, email, password } = userData;
+        const { full_name, username, password } = userData;
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const [result] = await db.execute(
-            'INSERT INTO users (full_name, email, password) VALUES (?, ?, ?)',
-            [full_name, email, hashedPassword]
+            'INSERT INTO users (full_name, username, password) VALUES (?, ?, ?)',
+            [full_name, username, hashedPassword]
         );
 
         return result.insertId;
     }
 
-    static async findByEmail(email) {
+    static async findByUsername(username) {
         const [rows] = await db.execute(
-            'SELECT * FROM users WHERE email = ?',
-            [email]
+            'SELECT * FROM users WHERE username = ?',
+            [username]
         );
         return rows[0];
     }
 
     static async findById(id) {
         const [rows] = await db.execute(
-            'SELECT id, full_name, email, status, created_at FROM users WHERE id = ?',
+            'SELECT id, full_name, username, status, created_at FROM users WHERE id = ?',
             [id]
         );
         return rows[0];
@@ -32,7 +32,7 @@ class User {
 
     static async getAllUsers(excludeId) {
         const [rows] = await db.execute(
-            'SELECT id, full_name, email, status FROM users WHERE id != ?',
+            'SELECT id, full_name, username, status FROM users WHERE id != ?',
             [excludeId]
         );
         return rows;
